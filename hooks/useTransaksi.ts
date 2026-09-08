@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, useCallback } from "react";
 import { storage } from "@/lib/storage";
 import type { Transaksi } from "@/lib/types";

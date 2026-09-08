@@ -40,19 +40,19 @@ export default function GrafikPage() {
           <div className="h-48 mt-3">
             {/* @ts-expect-error recharts dynamic */}
             <ResponsiveContainer width="100%" height="100%">
-              {/* @ts-expect-error */}
+              {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
               <LineChart data={byDay}>
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <CartesianGrid strokeDasharray="3 3" />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <XAxis dataKey="tanggal" tick={{fontSize:10}} tickFormatter={(v:string)=>v.slice(5)} />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <YAxis tick={{fontSize:10}} />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <Tooltip />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <Line type="monotone" dataKey="bersih" stroke="#16a34a" strokeWidth={2} dot={false} name="Bersih" />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <Line type="monotone" dataKey="totalPendapatan" stroke="#3b82f6" strokeWidth={1} dot={false} name="Pendapatan" />
               </LineChart>
             </ResponsiveContainer>
@@ -66,19 +66,19 @@ export default function GrafikPage() {
           <p className="py-6 text-center text-sm text-zinc-400">Isi jarak KM agar Rp/KM terhitung</p>
         ) : (
           <div className="h-40 mt-3">
-            {/* @ts-expect-error */}
+            {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
             <ResponsiveContainer width="100%" height="100%">
-              {/* @ts-expect-error */}
+              {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
               <BarChart data={byDay}>
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <CartesianGrid strokeDasharray="3 3" />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <XAxis dataKey="tanggal" tick={{fontSize:10}} tickFormatter={(v:string)=>v.slice(5)} />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <YAxis tick={{fontSize:10}} />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <Tooltip />
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <Bar dataKey="rataRpPerKm" fill="#f59e0b" name="Rp/KM" />
               </BarChart>
             </ResponsiveContainer>
@@ -94,17 +94,17 @@ export default function GrafikPage() {
         ) : (
           <>
             <div className="h-40 mt-3">
-              {/* @ts-expect-error */}
+              {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
               <ResponsiveContainer width="100%" height="100%">
-                {/* @ts-expect-error */}
+                {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                 <BarChart data={jam}>
-                  {/* @ts-expect-error */}
+                  {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                   <XAxis dataKey="jam" tick={{fontSize:10}} />
-                  {/* @ts-expect-error */}
+                  {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                   <YAxis allowDecimals={false} tick={{fontSize:10}} />
-                  {/* @ts-expect-error */}
+                  {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                   <Tooltip />
-                  {/* @ts-expect-error */}
+                  {/* @ts-expect-error recharts dynamic ssr:false — safe, typed as never */}
                   <Bar dataKey="count" fill="#16a34a" />
                 </BarChart>
               </ResponsiveContainer>

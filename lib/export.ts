@@ -3,8 +3,9 @@ import type { Transaksi } from "./types";
 const HEADERS = ["id","tipe","tanggal","waktu","nominal","platform","jarak_km","rp_per_km","kategori","catatan","sumber_input","created_at"] as const;
 
 function escapeCsv(v: unknown): string {
-  const s = v == null ? "" : String(v);
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+  let s = v == null ? "" : String(v);
+  if (/^[=+\-@|%\t\r]/.test(s)) s = "'" + s;
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.startsWith("'")) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 

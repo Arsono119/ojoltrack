@@ -142,6 +142,8 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
           <input id="screenshot-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e)=>{
             const file = e.target.files?.[0];
             if (!file) return;
+            if (file.size > 10 * 1024 * 1024) { setError("File max 10MB"); return; }
+            if (!file.type.startsWith("image/")) { setError("Harus gambar (JPG/PNG/WebP)"); return; }
             const preview = URL.createObjectURL(file);
             setVisionPreview(preview);
             setVisionLoading(true);

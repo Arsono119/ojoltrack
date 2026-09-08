@@ -31,6 +31,13 @@ export async function POST(req: NextRequest) {
       const form = await req.formData();
       const file = form.get("image") as File | null;
       if (file) {
+        const ALLOWED = new Set(["image/jpeg","image/png","image/webp","image/heic","image/heif"]);
+        if (!ALLOWED.has(file.type)) {
+          return NextResponse.json({ ok: false, error: "Format harus JPG/PNG/WebP/HEIC" }, { status: 415 });
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          return NextResponse.json({ ok: false, error: "File terlalu besar (max 10MB)" }, { status: 413 });
+        }
         const buf = Buffer.from(await file.arrayBuffer());
         if (buf.length > MAX_IMAGE_BYTES) {
           return NextResponse.json({ ok: false, error: "File terlalu besar (max 10MB)" }, { status: 413 });
@@ -57,12 +64,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, data });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    // Don't leak upstream details; log server-side, return generic to client
-    console.error("[extract] error:", msg);
+    console.error("[extract] error:", msg, { ip: req.headers.get("x-forwarded-for") });
     const isUpstream = msg.includes("OpenRouter") || msg.includes("Groq");
-    return NextResponse.json(
-      { ok: false, error: isUpstream ? "Gagal membaca screenshot — coba isi manual" : msg },
-      { status: isUpstream ? 502 : 500 },
-    );
+    if (isUpstream) {
+      return NextResponse.json({ ok: false, error: "Gagal membaca screenshot — coba isi manual" }, { status: 502 });
+    }
+    return NextResponse.json({ ok: false, error: "Terjadi kesalahan — coba lagi" }, { status: 500 });
   }
 }
