@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { nanoid } from "nanoid";
 import { calcRpPerKm } from "@/lib/calc";
-import { parseRupiah } from "@/lib/parse";
+import { parseJarak, parseRupiah } from "@/lib/parse";
 import { categorize } from "@/lib/categorize";
 import { storage } from "@/lib/storage";
 import type { Platform, Kategori } from "@/lib/types";
@@ -32,7 +32,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
   const [visionPreview, setVisionPreview] = useState<string>("");
 
   const nominal = parseRupiah(nominalStr);
-  const jarak_km = jarakStr ? parseFloat(jarakStr.replace(",",".")) : null;
+  const jarak_km = parseJarak(jarakStr);
   const rp_per_km = useMemo(() => calcRpPerKm(nominal, jarak_km), [nominal, jarak_km]);
 
   const handleCatatanChange = (v: string) => {
@@ -47,6 +47,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
     e.preventDefault();
     setError("");
     if (!nominal || nominal <= 0) { setError("Nominal harus > 0"); return; }
+    if (nominal > 100_000_000) { setError("Nominal terlalu besar (max 100 jt)"); return; }
     if (jarakStr && (jarak_km == null || jarak_km <= 0)) { setError("Jarak harus > 0"); return; }
     if (tipe === "pendapatan" && !platform) { setError("Pilih platform"); return; }
 
@@ -64,7 +65,12 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
       sumber_input: "manual" as const,
       created_at: new Date().toISOString(),
     };
-    storage.add(t as never);
+    try {
+      storage.add(t as never);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal simpan — penyimpanan penuh");
+      return;
+    }
     if (onSuccess) onSuccess();
     router.push("/");
   };
@@ -82,12 +88,12 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Argo (Rp)</Label>
-              <Input inputMode="numeric" placeholder="18000" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} />
+              <Input inputMode="numeric" placeholder="18000" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} maxLength={12} />
               {nominal > 0 && <p className="text-xs text-zinc-500">{nominal.toLocaleString("id-ID")}</p>}
             </div>
             <div className="space-y-1">
               <Label>Jarak (KM, opsional)</Label>
-              <Input inputMode="decimal" placeholder="6.2" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} />
+              <Input inputMode="decimal" placeholder="6.2" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} maxLength={6} />
               <p className="text-[11px] text-zinc-400">Salin dari estimasi aplikasi</p>
             </div>
           </div>
@@ -101,7 +107,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
         <>
           <div className="space-y-1">
             <Label>Nominal (Rp)</Label>
-            <Input inputMode="numeric" placeholder="25000" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} />
+            <Input inputMode="numeric" placeholder="25000" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} maxLength={12} />
           </div>
           <div className="space-y-1">
             <Label>Kategori</Label>
@@ -124,7 +130,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
 
       <div className="space-y-1">
         <Label>Catatan</Label>
-        <Textarea rows={2} placeholder={tipe==="pendapatan" ? "Orderan GrabBike" : "Isi bensin pagi"} value={catatan} onChange={(e)=>handleCatatanChange(e.target.value)} />
+        <Textarea rows={2} maxLength={200} placeholder={tipe==="pendapatan" ? "Orderan GrabBike" : "Isi bensin pagi"} value={catatan} onChange={(e)=>handleCatatanChange(e.target.value)} />
       </div>
 
       <div className="space-y-2">
@@ -159,7 +165,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
       </div>
 
       {visionResult && (
-        <ScreenshotConfirm result={visionResult} preview={visionPreview} onClose={()=>{ setVisionResult(null); setVisionPreview(""); }} />
+        <ScreenshotConfirm result={visionResult} preview={visionPreview} onClose={()=>{ if (visionPreview) URL.revokeObjectURL(visionPreview); setVisionResult(null); setVisionPreview(""); }} />
       )}
 
       {error && !visionResult && <p className="text-sm text-red-600">{error}</p>}

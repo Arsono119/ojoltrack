@@ -8,6 +8,26 @@ function escapeCsv(v: unknown): string {
   return s;
 }
 
+function splitCsv(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (c === ',' && !inQuote) {
+      out.push(cur);
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
 export function exportToCSV(transaksi: Transaksi[]): string {
   const rows = [HEADERS.join(",")];
   for (const t of transaksi) {
@@ -23,12 +43,11 @@ export function exportToBlob(transaksi: Transaksi[]): Blob {
 export function parseCSV(csv: string): Transaksi[] {
   const lines = csv.trim().split("\n");
   if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = splitCsv(lines[0]).map((h) => h.trim());
   const result: Transaksi[] = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    // simple split — assumes no quoted commas in test data; for prod use papaparse if needed
-    const cols = line.split(",");
+    const cols = splitCsv(line);
     const obj: Record<string, string> = {};
     headers.forEach((h, idx) => (obj[h] = cols[idx] ?? ""));
     result.push({

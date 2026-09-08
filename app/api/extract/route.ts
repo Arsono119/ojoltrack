@@ -4,20 +4,31 @@ import { extractViaVision } from "@/lib/vision";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_BASE64_LEN = 14_000_000; // ~10MB binary
+
 export async function POST(req: NextRequest) {
   try {
+    const contentLen = Number(req.headers.get("content-length") || 0);
+    if (contentLen > MAX_IMAGE_BYTES + 1024) {
+      return NextResponse.json({ ok: false, error: "File terlalu besar (max 10MB)" }, { status: 413 });
+    }
+
     const contentType = req.headers.get("content-type") || "";
     let base64: string | null = null;
 
     if (contentType.includes("application/json")) {
       const body = await req.json() as { image?: string };
       base64 = body.image || null;
+      if (base64 && base64.length > MAX_BASE64_LEN) {
+        return NextResponse.json({ ok: false, error: "Gambar terlalu besar (max 10MB)" }, { status: 413 });
+      }
     } else {
       const form = await req.formData();
       const file = form.get("image") as File | null;
       if (file) {
         const buf = Buffer.from(await file.arrayBuffer());
-        if (buf.length > 10 * 1024 * 1024) {
+        if (buf.length > MAX_IMAGE_BYTES) {
           return NextResponse.json({ ok: false, error: "File terlalu besar (max 10MB)" }, { status: 413 });
         }
         base64 = `data:${file.type || "image/jpeg"};base64,${buf.toString("base64")}`;
@@ -25,6 +36,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (!base64) return NextResponse.json({ ok: false, error: "Tidak ada gambar" }, { status: 400 });
+    if (base64.length > MAX_BASE64_LEN) {
+      return NextResponse.json({ ok: false, error: "Gambar terlalu besar (max 10MB)" }, { status: 413 });
+    }
 
     const data = await extractViaVision(base64);
 
@@ -39,7 +53,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, data });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    // graceful fallback — never crash, let client show manual fallback
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    // Don't leak upstream details; log server-side, return generic to client
+    console.error("[extract] error:", msg);
+    const isUpstream = msg.includes("OpenRouter") || msg.includes("Groq");
+    return NextResponse.json(
+      { ok: false, error: isUpstream ? "Gagal membaca screenshot — coba isi manual" : msg },
+      { status: isUpstream ? 502 : 500 },
+    );
   }
 }

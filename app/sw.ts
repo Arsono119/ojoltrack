@@ -15,7 +15,10 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    ...defaultCache.filter((e) => !String((e as { urlPattern?: unknown }).urlPattern ?? "").includes("api")),
+    { urlPattern: /^\/api\/.*/i, handler: "NetworkOnly" as never } as never,
+  ],
 });
 
 serwist.addEventListeners();

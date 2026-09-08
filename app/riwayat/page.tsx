@@ -7,7 +7,7 @@ import { exportToCSV } from "@/lib/export";
 
 function groupByTanggal(data: ReturnType<typeof useTransaksi>["data"]) {
   const map = new Map<string, typeof data>();
-  for (const t of [...data].sort((a,b)=> (b.tanggal+b.waktu!).localeCompare(a.tanggal+a.waktu!))) {
+  for (const t of [...data].sort((a,b)=> (`${b.tanggal} ${b.waktu ?? "00:00"}`).localeCompare(`${a.tanggal} ${a.waktu ?? "00:00"}`))) {
     const arr = map.get(t.tanggal) || [];
     arr.push(t);
     map.set(t.tanggal, arr);

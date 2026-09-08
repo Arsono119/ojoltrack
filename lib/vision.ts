@@ -22,9 +22,7 @@ function sanitizeResult(raw: unknown): ExtractResult {
 }
 
 function extractJson(text: string): unknown {
-  // try direct JSON
   try { return JSON.parse(text); } catch {}
-  // try find JSON block
   const match = text.match(/\{[\s\S]*\}/);
   if (match) {
     try { return JSON.parse(match[0]); } catch {}
@@ -32,8 +30,18 @@ function extractJson(text: string): unknown {
   throw new Error("Gagal parse JSON dari vision");
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, ms = 15_000): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function callOpenRouter(base64: string, apiKey: string): Promise<ExtractResult> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
@@ -52,14 +60,18 @@ async function callOpenRouter(base64: string, apiKey: string): Promise<ExtractRe
       max_tokens: 500,
     }),
   });
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[vision] OpenRouter upstream", res.status, body.slice(0,500));
+    throw new Error(`Gagal ekstrak gambar (OpenRouter ${res.status})`);
+  }
   const json = await res.json() as { choices: { message: { content: string } }[] };
   const content = json.choices?.[0]?.message?.content || "";
   return sanitizeResult(extractJson(content));
 }
 
 async function callGroq(base64: string, apiKey: string): Promise<ExtractResult> {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -73,7 +85,11 @@ async function callGroq(base64: string, apiKey: string): Promise<ExtractResult> 
       max_tokens: 500,
     }),
   });
-  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[vision] Groq upstream", res.status, body.slice(0,500));
+    throw new Error(`Gagal ekstrak gambar (Groq ${res.status})`);
+  }
   const json = await res.json() as { choices: { message: { content: string } }[] };
   const content = json.choices?.[0]?.message?.content || "";
   return sanitizeResult(extractJson(content));
@@ -85,7 +101,7 @@ export async function extractViaVision(base64: string): Promise<ExtractResult> {
   if (orKey) {
     try { return await callOpenRouter(base64, orKey); } catch (e) {
       if (!groqKey) throw e;
-      // fallback to Groq
+      console.warn("[vision] OpenRouter failed, fallback to Groq", e);
     }
   }
   if (groqKey) return await callGroq(base64, groqKey);

@@ -14,13 +14,12 @@ export function useTransaksi() {
 
   useEffect(() => {
     refresh();
-    const onStorage = () => refresh();
-    window.addEventListener("storage", onStorage);
-    // poll for same-tab updates
-    const id = setInterval(refresh, 800);
+    const handler = () => refresh();
+    window.addEventListener("storage", handler);
+    window.addEventListener("ojoltrack:change", handler);
     return () => {
-      window.removeEventListener("storage", onStorage);
-      clearInterval(id);
+      window.removeEventListener("storage", handler);
+      window.removeEventListener("ojoltrack:change", handler);
     };
   }, [refresh]);
 
