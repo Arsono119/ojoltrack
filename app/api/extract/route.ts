@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractViaVision } from "@/lib/vision";
+import { ENABLE_VISION } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -8,6 +9,9 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_BASE64_LEN = 14_000_000; // ~10MB binary
 
 export async function POST(req: NextRequest) {
+  if (!ENABLE_VISION) {
+    return NextResponse.json({ ok: false, error: "Fitur screenshot segera hadir — Fase 2" }, { status: 503 });
+  }
   try {
     const contentLen = Number(req.headers.get("content-length") || 0);
     if (contentLen > MAX_IMAGE_BYTES + 1024) {

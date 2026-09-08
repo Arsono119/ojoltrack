@@ -10,6 +10,7 @@ import { SegmentedControl } from "./ui/SegmentedControl";
 import { Input, Textarea, Label } from "./ui/Input";
 import { Button } from "./ui/Button";
 import { useRouter } from "next/navigation";
+import { ENABLE_VISION } from "@/lib/config";
 import ScreenshotConfirm from "./ScreenshotConfirm";
 import type { ExtractResult } from "@/lib/vision";
 
@@ -133,38 +134,45 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
         <Textarea rows={2} maxLength={200} placeholder={tipe==="pendapatan" ? "Orderan GrabBike" : "Isi bensin pagi"} value={catatan} onChange={(e)=>handleCatatanChange(e.target.value)} />
       </div>
 
-      <div className="space-y-2">
-        <Button type="button" variant="ghost" className="w-full justify-center border border-dashed border-zinc-300" disabled={visionLoading} onClick={()=>document.getElementById("screenshot-input")?.click()}>
-          {visionLoading ? "Membaca struk..." : "📷 Upload Screenshot (otomatis isi)"}
-        </Button>
-        <input id="screenshot-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e)=>{
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const preview = URL.createObjectURL(file);
-          setVisionPreview(preview);
-          setVisionLoading(true);
-          setError("");
-          try {
-            const form = new FormData();
-            form.append("image", file);
-            const res = await fetch("/api/extract", { method: "POST", body: form });
-            const json = await res.json();
-            if (json.ok) {
-              setVisionResult(json.data);
-            } else {
-              setError(json.error || "Gagal membaca screenshot — silakan isi manual");
+      {ENABLE_VISION ? (
+        <div className="space-y-2">
+          <Button type="button" variant="ghost" className="w-full justify-center border border-dashed border-zinc-300" disabled={visionLoading} onClick={()=>document.getElementById("screenshot-input")?.click()}>
+            {visionLoading ? "Membaca struk..." : "📷 Upload Screenshot (otomatis isi)"}
+          </Button>
+          <input id="screenshot-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e)=>{
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const preview = URL.createObjectURL(file);
+            setVisionPreview(preview);
+            setVisionLoading(true);
+            setError("");
+            try {
+              const form = new FormData();
+              form.append("image", file);
+              const res = await fetch("/api/extract", { method: "POST", body: form });
+              const json = await res.json();
+              if (json.ok) {
+                setVisionResult(json.data);
+              } else {
+                setError(json.error || "Gagal membaca screenshot — silakan isi manual");
+              }
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Gagal upload — isi manual");
+            } finally {
+              setVisionLoading(false);
+              (e.target as HTMLInputElement).value = "";
             }
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Gagal upload — isi manual");
-          } finally {
-            setVisionLoading(false);
-            (e.target as HTMLInputElement).value = "";
-          }
-        }} />
-        {error && !visionResult && <p className="text-xs text-amber-600">{error} — isi manual tetap bisa</p>}
-      </div>
+          }} />
+          {error && !visionResult && <p className="text-xs text-amber-600">{error} — isi manual tetap bisa</p>}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-3 py-3 text-center">
+          <p className="text-xs text-zinc-500">📷 Fitur screenshot segera hadir — Fase 2</p>
+          <p className="text-[11px] text-zinc-400">Untuk sekarang isi manual dulu</p>
+        </div>
+      )}
 
-      {visionResult && (
+      {ENABLE_VISION && visionResult && (
         <ScreenshotConfirm result={visionResult} preview={visionPreview} onClose={()=>{ if (visionPreview) URL.revokeObjectURL(visionPreview); setVisionResult(null); setVisionPreview(""); }} />
       )}
 
