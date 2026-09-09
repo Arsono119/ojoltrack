@@ -1,5 +1,6 @@
 "use client";
-import { useState, useMemo } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useMemo, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { calcRpPerKm } from "@/lib/calc";
 import { parseJarak, parseRupiah } from "@/lib/parse";
@@ -26,6 +27,19 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
   const [tanggal, setTanggal] = useState(today());
   const [waktu, setWaktu] = useState(nowTime());
   const [kategori, setKategori] = useState<Kategori>("bensin");
+
+  // Memory: load last form prefs (tipe/platform/kategori) from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ojoltrack_last_form");
+      if (raw) {
+        const m = JSON.parse(raw) as { tipe?: string; platform?: Platform; kategori?: Kategori };
+        if (m.tipe === "pendapatan" || m.tipe === "pengeluaran") setTipe(m.tipe);
+        if (m.platform && ["Shopee Drive","Grab","Lainnya"].includes(m.platform as string)) setPlatform(m.platform as Platform);
+        if (m.kategori && ["bensin","makan","servis","lainnya"].includes(m.kategori as string)) setKategori(m.kategori as Kategori);
+      }
+    } catch {}
+  }, []);
   const [catatan, setCatatan] = useState("");
   const [error, setError] = useState("");
   const [visionLoading, setVisionLoading] = useState(false);
@@ -68,6 +82,10 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
     };
     try {
       storage.add(t as never);
+      // save memory for next form open
+      try {
+        localStorage.setItem("ojoltrack_last_form", JSON.stringify({ tipe, platform, kategori }));
+      } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal simpan — penyimpanan penuh");
       return;
@@ -109,6 +127,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
           <div className="space-y-1">
             <Label>Nominal (Rp)</Label>
             <Input inputMode="numeric" placeholder="25000" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} maxLength={12} />
+            {nominal > 0 && <p className="text-xs text-zinc-500">{nominal.toLocaleString("id-ID")}</p>}
           </div>
           <div className="space-y-1">
             <Label>Kategori</Label>
