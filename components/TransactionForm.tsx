@@ -1,25 +1,24 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect -- intentional hydration from localStorage */
+/* eslint-disable react-hooks/set-state-in-effect -- intentional hydration */
 import { useState, useMemo, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { calcRpPerKm } from "@/lib/calc";
 import { parseJarak, parseRupiah } from "@/lib/parse";
 import { categorize } from "@/lib/categorize";
-import { storage } from "@/lib/storage";
 import type { Platform, Kategori } from "@/lib/types";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { Input, Textarea, Label } from "./ui/Input";
 import { Button } from "./ui/Button";
 import { useRouter } from "next/navigation";
 import { ENABLE_VISION } from "@/lib/config";
+import { useTransaksi } from "@/hooks/useTransaksi";
 import ScreenshotConfirm from "./ScreenshotConfirm";
 import type { ExtractResult } from "@/lib/vision";
-
 function today(): string { return new Date().toISOString().slice(0,10); }
 function nowTime(): string { return `${String(new Date().getHours()).padStart(2,"0")}:${String(new Date().getMinutes()).padStart(2,"0")}`; }
-
 export default function TransactionForm({ onSuccess }: { onSuccess?: () => void }) {
   const router = useRouter();
+  const { add } = useTransaksi();
   const [tipe, setTipe] = useState<"pendapatan"|"pengeluaran">("pendapatan");
   const [platform, setPlatform] = useState<Platform>("Grab");
   const [nominalStr, setNominalStr] = useState("");
@@ -27,8 +26,14 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
   const [tanggal, setTanggal] = useState(today());
   const [waktu, setWaktu] = useState(nowTime());
   const [kategori, setKategori] = useState<Kategori>("bensin");
-
-  // Memory: load last form prefs — type-aware, avoids cross-type pollution (W3)
+  const [catatan, setCatatan] = useState("");
+  const [error, setError] = useState("");
+  const [visionLoading, setVisionLoading] = useState(false);
+  const [visionResult, setVisionResult] = useState<ExtractResult | null>(null);
+  const [visionPreview, setVisionPreview] = useState<string>("");
+  const nominal = parseRupiah(nominalStr);
+  const jarak_km = parseJarak(jarakStr);
+  const rp_per_km = useMemo(() => calcRpPerKm(nominal, jarak_km), [nominal, jarak_km]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -48,16 +53,6 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
       }
     } catch {}
   }, []);
-  const [catatan, setCatatan] = useState("");
-  const [error, setError] = useState("");
-  const [visionLoading, setVisionLoading] = useState(false);
-  const [visionResult, setVisionResult] = useState<ExtractResult | null>(null);
-  const [visionPreview, setVisionPreview] = useState<string>("");
-
-  const nominal = parseRupiah(nominalStr);
-  const jarak_km = parseJarak(jarakStr);
-  const rp_per_km = useMemo(() => calcRpPerKm(nominal, jarak_km), [nominal, jarak_km]);
-
   const handleCatatanChange = (v: string) => {
     setCatatan(v);
     if (tipe === "pengeluaran") {
@@ -65,15 +60,13 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
       if (cat) setKategori(cat);
     }
   };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!nominal || nominal <= 0) { setError("Nominal harus > 0"); return; }
     if (nominal > 100_000_000) { setError("Nominal terlalu besar (max 100 jt)"); return; }
     if (jarakStr && (jarak_km == null || jarak_km <= 0)) { setError("Jarak harus > 0"); return; }
     if (tipe === "pendapatan" && !platform) { setError("Pilih platform"); return; }
-
     const t = {
       id: nanoid(),
       tipe,
@@ -89,8 +82,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
       created_at: new Date().toISOString(),
     };
     try {
-      storage.add(t as never);
-      // save memory type-aware (W3): platform for pendapatan, kategori for pengeluaran separately
+      await add(t as never);
       try {
         if (typeof window !== "undefined") {
           localStorage.setItem("ojoltrack_last_form", JSON.stringify({ tipe, platform }));
@@ -104,11 +96,9 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
     if (onSuccess) onSuccess();
     router.push("/");
   };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-4">
       <SegmentedControl options={["pendapatan","pengeluaran"]} value={tipe} onChange={(v)=>setTipe(v as never)} />
-
       {tipe === "pendapatan" ? (
         <>
           <div className="space-y-1">
@@ -147,7 +137,6 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
           </div>
         </>
       )}
-
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Tanggal</Label>
@@ -158,19 +147,17 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
           <Input type="time" value={waktu} onChange={(e)=>setWaktu(e.target.value)} />
         </div>
       </div>
-
       <div className="space-y-1">
         <Label>Catatan</Label>
         <Textarea rows={2} maxLength={200} placeholder={tipe==="pendapatan" ? "Orderan GrabBike" : "Isi bensin pagi"} value={catatan} onChange={(e)=>handleCatatanChange(e.target.value)} />
       </div>
-
       {ENABLE_VISION ? (
         <div className="space-y-2">
           <Button type="button" variant="ghost" className="w-full justify-center border border-dashed border-zinc-300" disabled={visionLoading} onClick={()=>document.getElementById("screenshot-input")?.click()}>
             {visionLoading ? "Membaca struk..." : "📷 Upload Screenshot (otomatis isi)"}
           </Button>
           <input id="screenshot-input" type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e)=>{
-            const file = e.target.files?.[0];
+            const file = (e.target as HTMLInputElement).files?.[0];
             if (!file) return;
             if (file.size > 10 * 1024 * 1024) { setError("File max 10MB"); return; }
             if (!file.type.startsWith("image/")) { setError("Harus gambar (JPG/PNG/WebP)"); return; }
@@ -183,11 +170,8 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
               form.append("image", file);
               const res = await fetch("/api/extract", { method: "POST", body: form });
               const json = await res.json();
-              if (json.ok) {
-                setVisionResult(json.data);
-              } else {
-                setError(json.error || "Gagal membaca screenshot — silakan isi manual");
-              }
+              if (json.ok) setVisionResult(json.data);
+              else setError(json.error || "Gagal membaca screenshot — silakan isi manual");
             } catch (err) {
               setError(err instanceof Error ? err.message : "Gagal upload — isi manual");
             } finally {
@@ -203,13 +187,10 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
           <p className="text-[11px] text-zinc-400">Untuk sekarang isi manual dulu</p>
         </div>
       )}
-
       {ENABLE_VISION && visionResult && (
         <ScreenshotConfirm result={visionResult} preview={visionPreview} onClose={()=>{ if (visionPreview) URL.revokeObjectURL(visionPreview); setVisionResult(null); setVisionPreview(""); }} />
       )}
-
       {error && !visionResult && <p className="text-sm text-red-600">{error}</p>}
-
       <Button type="submit" size="lg" className="w-full">Simpan</Button>
     </form>
   );

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import HeaderAuth from "@/components/HeaderAuth";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="id" className={`${geist.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-zinc-50 antialiased">
         <div className="mx-auto w-full max-w-md flex-1 flex flex-col min-h-screen bg-white shadow-sm">
+          <HeaderAuth />
           <main className="flex-1 pb-20">{children}</main>
           <BottomNav />
         </div>

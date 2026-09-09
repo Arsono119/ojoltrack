@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect -- intentional reset on platform change */
+import { useState, useMemo, useEffect } from "react";
 import type { ExtractResult } from "@/lib/vision";
 import { calcRpPerKm } from "@/lib/calc";
 import { parseRupiah } from "@/lib/parse";
@@ -11,6 +12,7 @@ import { storage } from "@/lib/storage";
 import { nanoid } from "nanoid";
 import { useRouter } from "next/navigation";
 import type { Platform } from "@/lib/types";
+import { JENIS_LAYANAN_GRAB, JENIS_LAYANAN_SHOPEE, getOpsiJenisLayanan } from "@/lib/types";
 
 export default function ScreenshotConfirm({ result, preview, onClose }: { result: ExtractResult; preview: string; onClose: () => void }) {
   const router = useRouter();
@@ -20,6 +22,22 @@ export default function ScreenshotConfirm({ result, preview, onClose }: { result
   const [waktu, setWaktu] = useState(result.waktu || "");
   const [catatan, setCatatan] = useState(result.keterangan || "");
   const [tanggal] = useState(new Date().toISOString().slice(0,10));
+  const initialJenis = (result as unknown as Record<string, unknown>).jenis_layanan as string | null;
+  const isValidInitial = initialJenis && (
+    (platform === "Grab" && JENIS_LAYANAN_GRAB.includes(initialJenis as never)) ||
+    (platform === "Shopee Drive" && JENIS_LAYANAN_SHOPEE.includes(initialJenis as never))
+  );
+  const [jenisLayanan, setJenisLayanan] = useState<string | null>(isValidInitial ? initialJenis : null);
+  const [error, setError] = useState("");
+
+  const opsiJenis = useMemo(() => getOpsiJenisLayanan(platform), [platform]);
+
+  useEffect(() => {
+    if (jenisLayanan == null) return;
+    if (platform === "Grab" && !JENIS_LAYANAN_GRAB.includes(jenisLayanan as never)) setJenisLayanan(null);
+    else if (platform === "Shopee Drive" && !JENIS_LAYANAN_SHOPEE.includes(jenisLayanan as never)) setJenisLayanan(null);
+    else if (platform === "Lainnya" || platform == null) setJenisLayanan(null);
+  }, [platform, jenisLayanan]);
 
   const nominal = parseRupiah(nominalStr);
   const jarak_km = jarakStr ? parseFloat(jarakStr.replace(",",".")) : null;
@@ -27,6 +45,7 @@ export default function ScreenshotConfirm({ result, preview, onClose }: { result
 
   const handleSave = () => {
     if (!nominal || nominal <= 0) { alert("Nominal harus >0"); return; }
+    if ((platform === "Grab" || platform === "Shopee Drive") && !jenisLayanan) { setError("Pilih jenis layanan"); return; }
     storage.add({
       id: nanoid(),
       tipe: "pendapatan",
@@ -34,6 +53,7 @@ export default function ScreenshotConfirm({ result, preview, onClose }: { result
       waktu: waktu || null,
       nominal,
       platform,
+      jenis_layanan: (platform === "Grab" || platform === "Shopee Drive") ? (jenisLayanan as never) : null,
       jarak_km: jarak_km && jarak_km > 0 ? jarak_km : null,
       rp_per_km,
       kategori: null,
@@ -60,6 +80,13 @@ export default function ScreenshotConfirm({ result, preview, onClose }: { result
             <Label>Platform</Label>
             <SegmentedControl options={["Shopee Drive","Grab","Lainnya"]} value={platform as string} onChange={(v)=>setPlatform(v as Platform)} />
           </div>
+          {(platform === "Grab" || platform === "Shopee Drive") && (
+            <div className="space-y-1">
+              <Label>Jenis Layanan</Label>
+              <SegmentedControl options={[...opsiJenis]} value={jenisLayanan ?? ""} onChange={(v)=>setJenisLayanan(v)} />
+              {error && <p className="text-sm text-red-600">{error}</p>}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Argo (Rp)</Label><Input inputMode="numeric" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} /></div>
             <div className="space-y-1"><Label>Jarak (KM)</Label><Input inputMode="decimal" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} placeholder="opsional" /></div>

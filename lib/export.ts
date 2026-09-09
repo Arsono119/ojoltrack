@@ -1,11 +1,12 @@
 import type { Transaksi } from "./types";
 
-const HEADERS = ["id","tipe","tanggal","waktu","nominal","platform","jarak_km","rp_per_km","kategori","catatan","sumber_input","created_at"] as const;
+const HEADERS = ["id","tipe","tanggal","waktu","nominal","platform","jenis_layanan","jarak_km","rp_per_km","kategori","catatan","sumber_input","created_at"] as const;
 
 function escapeCsv(v: unknown): string {
   let s = v == null ? "" : String(v);
-  if (/^[=+\-@|%\t\r]/.test(s)) s = "'" + s;
-  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.startsWith("'")) return `"${s.replace(/"/g, '""')}"`;
+  const trimmed = s.trimStart();
+  if (/^[=+\-@]/.test(trimmed) || /^[\t\r]/.test(s)) s = "'" + s;
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.startsWith("'") || s !== trimmed) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
@@ -58,6 +59,7 @@ export function parseCSV(csv: string): Transaksi[] {
       waktu: obj.waktu || null,
       nominal: parseInt(obj.nominal, 10) || 0,
       platform: (obj.platform || null) as Transaksi["platform"],
+      jenis_layanan: (obj.jenis_layanan || null) as Transaksi["jenis_layanan"],
       jarak_km: obj.jarak_km ? parseFloat(obj.jarak_km) : null,
       rp_per_km: obj.rp_per_km ? parseInt(obj.rp_per_km, 10) : null,
       kategori: (obj.kategori || null) as Transaksi["kategori"],
