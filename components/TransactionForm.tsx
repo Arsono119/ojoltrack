@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/set-state-in-effect -- intentional hydration from localStorage */
 import { useState, useMemo, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { calcRpPerKm } from "@/lib/calc";
@@ -28,15 +28,23 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
   const [waktu, setWaktu] = useState(nowTime());
   const [kategori, setKategori] = useState<Kategori>("bensin");
 
-  // Memory: load last form prefs (tipe/platform/kategori) from localStorage
+  // Memory: load last form prefs — type-aware, avoids cross-type pollution (W3)
   useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
       const raw = localStorage.getItem("ojoltrack_last_form");
       if (raw) {
-        const m = JSON.parse(raw) as { tipe?: string; platform?: Platform; kategori?: Kategori };
-        if (m.tipe === "pendapatan" || m.tipe === "pengeluaran") setTipe(m.tipe);
-        if (m.platform && ["Shopee Drive","Grab","Lainnya"].includes(m.platform as string)) setPlatform(m.platform as Platform);
-        if (m.kategori && ["bensin","makan","servis","lainnya"].includes(m.kategori as string)) setKategori(m.kategori as Kategori);
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          const m = parsed as Record<string, unknown>;
+          if (m.tipe === "pendapatan" || m.tipe === "pengeluaran") setTipe(m.tipe as "pendapatan" | "pengeluaran");
+          if (typeof m.platform === "string" && ["Shopee Drive","Grab","Lainnya"].includes(m.platform)) setPlatform(m.platform as Platform);
+        }
+      }
+      const rawKat = localStorage.getItem("ojoltrack_last_kategori");
+      if (rawKat) {
+        const kat = JSON.parse(rawKat) as unknown;
+        if (typeof kat === "string" && ["bensin","makan","servis","lainnya"].includes(kat)) setKategori(kat as Kategori);
       }
     } catch {}
   }, []);
@@ -82,9 +90,12 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
     };
     try {
       storage.add(t as never);
-      // save memory for next form open
+      // save memory type-aware (W3): platform for pendapatan, kategori for pengeluaran separately
       try {
-        localStorage.setItem("ojoltrack_last_form", JSON.stringify({ tipe, platform, kategori }));
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ojoltrack_last_form", JSON.stringify({ tipe, platform }));
+          localStorage.setItem("ojoltrack_last_kategori", JSON.stringify(kategori));
+        }
       } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal simpan — penyimpanan penuh");

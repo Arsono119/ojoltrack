@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/set-state-in-effect -- intentional hydration from localStorage */
 import { useEffect, useState, useCallback } from "react";
 import { storage } from "@/lib/storage";
 import type { Transaksi } from "@/lib/types";
