@@ -5,7 +5,8 @@ import { nanoid } from "nanoid";
 import { calcRpPerKm } from "@/lib/calc";
 import { parseJarak, parseRupiah } from "@/lib/parse";
 import { categorize } from "@/lib/categorize";
-import type { Platform, Kategori } from "@/lib/types";
+import type { Platform, Kategori, JenisLayanan } from "@/lib/types";
+import { getOpsiJenisLayanan } from "@/lib/types";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { Input, Textarea, Label } from "./ui/Input";
 import { Button } from "./ui/Button";
@@ -27,6 +28,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
   const [waktu, setWaktu] = useState(nowTime());
   const [kategori, setKategori] = useState<Kategori>("bensin");
   const [catatan, setCatatan] = useState("");
+  const [jenisLayanan, setJenisLayanan] = useState<JenisLayanan | null>(null);
   const [error, setError] = useState("");
   const [visionLoading, setVisionLoading] = useState(false);
   const [visionResult, setVisionResult] = useState<ExtractResult | null>(null);
@@ -65,8 +67,9 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
     setError("");
     if (!nominal || nominal <= 0) { setError("Nominal harus > 0"); return; }
     if (nominal > 100_000_000) { setError("Nominal terlalu besar (max 100 jt)"); return; }
-    if (jarakStr && (jarak_km == null || jarak_km <= 0)) { setError("Jarak harus > 0"); return; }
     if (tipe === "pendapatan" && !platform) { setError("Pilih platform"); return; }
+    if (tipe === "pendapatan" && platform && platform !== "Lainnya" && !jenisLayanan) { setError("Pilih jenis layanan"); return; }
+    if (tipe === "pendapatan" && (!jarakStr || jarak_km == null || jarak_km <= 0)) { setError("Jarak KM wajib diisi"); return; }
     const t = {
       id: nanoid(),
       tipe,
@@ -74,6 +77,7 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
       waktu: waktu || null,
       nominal,
       platform: tipe === "pendapatan" ? platform : null,
+      jenis_layanan: tipe === "pendapatan" && platform !== "Lainnya" ? jenisLayanan : null,
       jarak_km: tipe === "pendapatan" ? jarak_km : null,
       rp_per_km: tipe === "pendapatan" ? rp_per_km : null,
       kategori: tipe === "pengeluaran" ? kategori : null,
@@ -103,8 +107,14 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
         <>
           <div className="space-y-1">
             <Label>Platform</Label>
-            <SegmentedControl options={["Shopee Drive","Grab","Lainnya"]} value={platform as string} onChange={(v)=>setPlatform(v as Platform)} />
+            <SegmentedControl options={["Shopee Drive","Grab","Lainnya"]} value={platform as string} onChange={(v)=>{ setPlatform(v as Platform); setJenisLayanan(null); }} />
           </div>
+          {platform !== "Lainnya" && (
+            <div className="space-y-1">
+              <Label>Jenis Layanan</Label>
+              <SegmentedControl options={getOpsiJenisLayanan(platform).map(String)} value={jenisLayanan ?? ""} onChange={(v)=>setJenisLayanan(v as JenisLayanan)} />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Argo (Rp)</Label>
@@ -112,9 +122,9 @@ export default function TransactionForm({ onSuccess }: { onSuccess?: () => void 
               {nominal > 0 && <p className="text-xs text-zinc-500">{nominal.toLocaleString("id-ID")}</p>}
             </div>
             <div className="space-y-1">
-              <Label>Jarak (KM, opsional)</Label>
-              <Input inputMode="decimal" placeholder="6.2" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} maxLength={6} />
-              <p className="text-[11px] text-zinc-400">Salin dari estimasi aplikasi</p>
+              <Label>Jarak (KM, wajib)</Label>
+              <Input inputMode="decimal" placeholder="Contoh: 6.2" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} maxLength={6} />
+              <p className="text-[11px] text-zinc-400">Contoh: 6.2 — salin dari estimasi aplikasi</p>
             </div>
           </div>
           {rp_per_km != null && (

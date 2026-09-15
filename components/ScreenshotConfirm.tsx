@@ -45,6 +45,7 @@ export default function ScreenshotConfirm({ result, preview, onClose }: { result
 
   const handleSave = () => {
     if (!nominal || nominal <= 0) { alert("Nominal harus >0"); return; }
+    if (!jarakStr || jarak_km == null || jarak_km <= 0) { setError("Jarak KM wajib diisi"); return; }
     if ((platform === "Grab" || platform === "Shopee Drive") && !jenisLayanan) { setError("Pilih jenis layanan"); return; }
     storage.add({
       id: nanoid(),
@@ -89,10 +90,10 @@ export default function ScreenshotConfirm({ result, preview, onClose }: { result
           )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Argo (Rp)</Label><Input inputMode="numeric" value={nominalStr} onChange={(e)=>setNominalStr(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Jarak (KM)</Label><Input inputMode="decimal" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} placeholder="opsional" /></div>
+            <div className="space-y-1"><Label>Jarak (KM)</Label><Input inputMode="decimal" value={jarakStr} onChange={(e)=>setJarakStr(e.target.value)} placeholder="wajib" /></div>
           </div>
           {rp_per_km != null && <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">→ Rp/KM: <b>{rp_per_km.toLocaleString("id-ID")}</b></div>}
-          {jarak_km == null && <p className="text-xs text-amber-600">Jarak tidak terdeteksi — isi manual dari estimasi di aplikasi (opsional)</p>}
+          {jarak_km == null && <p className="text-xs text-amber-600">Jarak tidak terdeteksi — isi manual dari estimasi di aplikasi</p>}
           <div className="space-y-1"><Label>Waktu (HH:mm)</Label><Input type="time" value={waktu} onChange={(e)=>setWaktu(e.target.value)} /></div>
           <div className="space-y-1"><Label>Catatan</Label><Textarea rows={2} value={catatan} onChange={(e)=>setCatatan(e.target.value)} /></div>
           <p className="text-xs text-amber-600">⚠️ Cek kembali sebelum simpan</p>

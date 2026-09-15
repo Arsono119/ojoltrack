@@ -26,7 +26,7 @@ export default function RiwayatPage() {
     else if (filter !== "Semua") r = r.filter(t=>t.platform===filter);
     if (q) {
       const lower = q.toLowerCase();
-      r = r.filter(t=> (t.catatan||"").toLowerCase().includes(lower) || (t.jenis_layanan||"").toLowerCase().includes(lower) || (t.platform||"").toLowerCase().includes(lower));
+      r = r.filter(t=> (t.catatan||"").toLowerCase().includes(lower) || (t.jenis_layanan||"").toLowerCase().includes(lower) || (t.platform||"").toLowerCase().includes(lower) || (t.jarak_km != null && String(t.jarak_km).includes(lower)));
     }
     return r;
   }, [data, filter, q]);
@@ -66,7 +66,7 @@ export default function RiwayatPage() {
             <Card key={t.id} className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{t.waktu ? t.waktu + " " : ""}{t.tipe==="pendapatan" ? (t.jenis_layanan ? `${t.platform} · ${t.jenis_layanan}` : t.platform) : t.kategori}</p>
-                <p className={`text-sm font-bold ${t.tipe==="pendapatan" ? "text-green-600" : "text-red-600"}`}>{t.tipe==="pendapatan" ? "+" : "-"}{t.nominal.toLocaleString("id-ID")} {t.jarak_km ? `· ${t.jarak_km}km` : ""}</p>
+                <p className={`text-sm font-bold ${t.tipe==="pendapatan" ? "text-green-600" : "text-red-600"}`}>{t.tipe==="pendapatan" ? "+" : "-"}{t.nominal.toLocaleString("id-ID")} {t.jarak_km != null ? `· ${t.jarak_km}km` : `· —`}</p>
                 {t.rp_per_km != null && <p className="text-xs text-zinc-500">Rp/KM: {t.rp_per_km.toLocaleString("id-ID")}</p>}
                 {t.catatan && <p className="text-xs text-zinc-500 truncate">{t.catatan}</p>}
               </div>

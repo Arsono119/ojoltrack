@@ -10,7 +10,7 @@ const SHOPEE_SET = new Set<string>([...JENIS_LAYANAN_SHOPEE]);
 
 const JenisLayananSchema = z.enum(JENIS_LAYANAN_ALL).nullable();
 
-const TransaksiSchema = z.object({
+const transaksiShape = {
   id: z.string().min(1),
   tipe: z.enum(["pendapatan", "pengeluaran"]),
   tanggal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -24,31 +24,35 @@ const TransaksiSchema = z.object({
   catatan: z.string().max(500).nullable(),
   sumber_input: z.enum(["manual", "screenshot"]),
   created_at: z.string().datetime({ offset: true }).or(z.string().min(1)),
-}).superRefine((obj, ctx) => {
-  if (obj.tipe === "pendapatan") {
-    if (obj.platform === "Grab") {
-      if (!obj.jenis_layanan || !GRAB_SET.has(obj.jenis_layanan as string)) {
-        ctx.addIssue({ code: "custom", path: ["jenis_layanan"], message: "Pilih jenis layanan Grab" });
-      }
+};
+
+function refineJenisLayanan(obj: unknown, ctx: z.RefinementCtx): void {
+  const o = obj as { tipe: string; platform: string | null; jenis_layanan: string | null };
+  if (o.tipe !== "pendapatan") return; // pengeluaran — no validation, will be normalized to null
+  if (o.platform === "Grab") {
+    if (!o.jenis_layanan || !GRAB_SET.has(o.jenis_layanan)) {
+      ctx.addIssue({ code: "custom", path: ["jenis_layanan"], message: "Pilih jenis layanan Grab" });
     }
-    if (obj.platform === "Shopee Drive") {
-      // For backward compat: allow null/missing on Shopee to preserve old data import
-      // but reject explicitly invalid enum values (e.g., GrabBike on Shopee)
-      if (obj.jenis_layanan != null && !SHOPEE_SET.has(obj.jenis_layanan as string)) {
-        ctx.addIssue({ code: "custom", path: ["jenis_layanan"], message: "Pilih jenis layanan Shopee Drive" });
-      }
-      // Note: Shopee missing/null is allowed for backward compat (AC-5 old data)
-      // UI layer still requires selection for new entries; strictness for Shopee invalid only.
-    }
-    if (obj.platform === "Lainnya" && obj.jenis_layanan !== null) {
-      ctx.addIssue({ code: "custom", path: ["jenis_layanan"], message: "Lainnya tidak punya jenis layanan" });
-    }
-    // Special: Grab with null/missing must fail (covers AC-3 zod test)
-    // Already handled above for Grab; if platform is Grab and jenis_layanan is null -> issue added
-  } else {
-    // pengeluaran — no validation, will be normalized to null
   }
-});
+  if (o.platform === "Shopee Drive") {
+    // For backward compat: allow null/missing on Shopee to preserve old data import
+    // but reject explicitly invalid enum values (e.g., GrabBike on Shopee)
+    if (o.jenis_layanan != null && !SHOPEE_SET.has(o.jenis_layanan)) {
+      ctx.addIssue({ code: "custom", path: ["jenis_layanan"], message: "Pilih jenis layanan Shopee Drive" });
+    }
+    // Note: Shopee missing/null is allowed for backward compat (AC-5 old data)
+    // UI layer still requires selection for new entries; strictness for Shopee invalid only.
+  }
+  if (o.platform === "Lainnya" && o.jenis_layanan !== null) {
+    ctx.addIssue({ code: "custom", path: ["jenis_layanan"], message: "Lainnya tidak punya jenis layanan" });
+  }
+  // Special: Grab with null/missing must fail (covers AC-3 zod test)
+  // Already handled above for Grab; if platform is Grab and jenis_layanan is null -> issue added
+}
+
+// Legacy schema — readRaw/importJSON backward compat: jarak_km tetap nullable untuk data lama
+// (skip jarak check, sama seperti perlakuan jenis_layanan Shopee null).
+const TransaksiSchemaLegacy = z.object(transaksiShape).superRefine(refineJenisLayanan);
 
 function isStorageAvailable(): boolean {
   try {
@@ -63,12 +67,19 @@ function isStorageAvailable(): boolean {
 
 function migrateTransaksi(raw: unknown): Transaksi | null {
   // safeParse with transform injects null for missing key
-  const parsed = TransaksiSchema.safeParse(raw);
+  // Legacy schema: jarak_km nullable — data lama (pendapatan tanpa jarak) tetap load
+  const parsed = TransaksiSchemaLegacy.safeParse(raw);
   if (parsed.success) return parsed.data as Transaksi;
   // For backward compat: if failure is only due to missing jenis_layanan on old data,
   // attempt to inject null and re-parse (handled by transform already, so this is fallback)
   // If still fails, return null to skip
   return null;
+}
+
+function assertJarakWajib(t: Transaksi): void {
+  if (t.tipe === "pendapatan" && (t.jarak_km == null || t.jarak_km <= 0)) {
+    throw new Error("Jarak KM wajib diisi untuk pendapatan");
+  }
 }
 
 function normalizeJenisLayanan(t: Transaksi): void {
@@ -148,6 +159,8 @@ export const storage = {
       normalized.rp_per_km = calcRpPerKm(normalized.nominal, normalized.jarak_km);
       normalizeJenisLayanan(normalized);
     } else { normalized.jarak_km = null; normalized.rp_per_km = null; normalized.jenis_layanan = null; }
+    if (all.some((e) => e.id === normalized.id)) return;
+    assertJarakWajib(normalized);
     all.push(normalized);
     writeRaw(all);
   },
@@ -163,6 +176,7 @@ export const storage = {
         normalizeJenisLayanan(next);
       } else { next.jarak_km = null; next.rp_per_km = null; next.jenis_layanan = null; }
       all[idx] = next;
+      assertJarakWajib(next);
       writeRaw(all);
     }
   },
@@ -193,7 +207,7 @@ export const storage = {
         skip++;
         continue;
       }
-      const parsed = TransaksiSchema.safeParse(item);
+      const parsed = TransaksiSchemaLegacy.safeParse(item);
       if (!parsed.success) {
         skip++;
         continue;
