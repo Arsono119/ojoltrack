@@ -44,3 +44,8 @@ __tests__/
 plans/
 vitest.*
 .opencode/
+
+# playwright
+/playwright-report/
+test-results/
+E2E_REPORT.md
